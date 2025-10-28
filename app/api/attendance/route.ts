@@ -5,18 +5,37 @@ import { UnregisteredUser } from '@/models/UnregisteredUser';
 import { AttendanceRecord } from '@/models/AttendanceRecord';
 import mongoose from 'mongoose';
 
+// CORS headers for cross-origin requests
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Max-Age': '86400',
+};
+
+// Handle preflight OPTIONS requests
+export async function OPTIONS(request: NextRequest) {
+  return new NextResponse(null, {
+    status: 200,
+    headers: corsHeaders,
+  });
+}
+
 export async function POST(request: NextRequest) {
   try {
     await connectDB();
 
-    const { rfid } = await request.json();
+    const { rfid, timestamp } = await request.json();
 
     if (!rfid) {
       return NextResponse.json(
         { error: 'RFID is required' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
+
+    // Parse the provided timestamp or use current time as fallback
+    const recordTimestamp = timestamp ? new Date(timestamp) : new Date();
 
     // Check if user exists
     const user = await User.findOne({ rfid });
@@ -30,7 +49,7 @@ export async function POST(request: NextRequest) {
       const attendanceRecord = new AttendanceRecord({
         rfid,
         userId: new mongoose.Types.ObjectId(user._id),
-        timestamp: new Date(),
+        timestamp: recordTimestamp,
         type: 'check-in', // You can modify this logic based on your requirements
       });
       await attendanceRecord.save();
@@ -44,7 +63,7 @@ export async function POST(request: NextRequest) {
           attendance: user.attendance,
         },
         timestamp: attendanceRecord.timestamp,
-      });
+      }, { headers: corsHeaders });
     } else {
       // User is not registered - handle unregistered user
       let unregisteredUser = await UnregisteredUser.findOne({ rfid });
@@ -52,13 +71,13 @@ export async function POST(request: NextRequest) {
       if (unregisteredUser) {
         // Update existing unregistered user
         unregisteredUser.scannedCount += 1;
-        unregisteredUser.lastSeen = new Date();
+        unregisteredUser.lastSeen = recordTimestamp;
         await unregisteredUser.save();
       } else {
         // Create new unregistered user
         unregisteredUser = new UnregisteredUser({
           rfid,
-          lastSeen: new Date(),
+          lastSeen: recordTimestamp,
           scannedCount: 1,
         });
         await unregisteredUser.save();
@@ -67,7 +86,7 @@ export async function POST(request: NextRequest) {
       // Create attendance record for unregistered user
       const attendanceRecord = new AttendanceRecord({
         rfid,
-        timestamp: new Date(),
+        timestamp: recordTimestamp,
         type: 'check-in',
       });
       await attendanceRecord.save();
@@ -81,13 +100,13 @@ export async function POST(request: NextRequest) {
           lastSeen: unregisteredUser.lastSeen,
         },
         timestamp: attendanceRecord.timestamp,
-      });
+      }, { headers: corsHeaders });
     }
   } catch (error) {
     console.error('Error processing RFID scan:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }

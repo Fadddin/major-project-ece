@@ -7,9 +7,55 @@ export async function GET(request: NextRequest) {
   try {
     await connectDB();
 
-    // Get all attendance records
-    const attendanceRecords = await AttendanceRecord.find({})
-      .sort({ timestamp: -1 });
+    // Get pagination parameters from query string
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '10');
+    const search = searchParams.get('search') || '';
+    const dateFilter = searchParams.get('date') || '';
+
+    // Calculate skip value for pagination
+    const skip = (page - 1) * limit;
+
+    // Build filter object
+    const filter: any = {};
+    
+    if (search) {
+      // Get user IDs that match the search term
+      const users = await User.find({
+        $or: [
+          { name: { $regex: search, $options: 'i' } },
+          { rfid: { $regex: search, $options: 'i' } }
+        ]
+      });
+      const userIds = users.map(user => user.rfid);
+      
+      filter.$or = [
+        { rfid: { $in: userIds } },
+        { rfid: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    if (dateFilter) {
+      const startDate = new Date(dateFilter);
+      const endDate = new Date(dateFilter);
+      endDate.setDate(endDate.getDate() + 1);
+      
+      filter.timestamp = {
+        $gte: startDate,
+        $lt: endDate
+      };
+    }
+
+    // Get total count for pagination
+    const totalRecords = await AttendanceRecord.countDocuments(filter);
+    const totalPages = Math.ceil(totalRecords / limit);
+
+    // Get paginated attendance records
+    const attendanceRecords = await AttendanceRecord.find(filter)
+      .sort({ timestamp: -1 })
+      .skip(skip)
+      .limit(limit);
 
     // Get all users to create a lookup map
     const users = await User.find({});
@@ -29,7 +75,17 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: recordsWithNames,
+      data: {
+        records: recordsWithNames,
+        pagination: {
+          currentPage: page,
+          totalPages,
+          totalRecords,
+          limit,
+          hasNextPage: page < totalPages,
+          hasPrevPage: page > 1
+        }
+      },
     });
   } catch (error) {
     console.error('Error fetching attendance records:', error);

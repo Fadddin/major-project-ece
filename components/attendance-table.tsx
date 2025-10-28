@@ -5,31 +5,43 @@ import { Search, Download, Filter, Loader2 } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { useAttendanceRecords, getUserName } from "@/hooks/use-api"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { 
+  Pagination, 
+  PaginationContent, 
+  PaginationItem, 
+  PaginationLink, 
+  PaginationNext, 
+  PaginationPrevious, 
+  PaginationEllipsis 
+} from "@/components/ui/pagination"
+import { useAttendanceRecordsPaginated, getUserName } from "@/hooks/use-api"
 
 export function AttendanceTable() {
   const [searchTerm, setSearchTerm] = useState("")
   const [dateFilter, setDateFilter] = useState("")
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
-  const { data, loading, error } = useAttendanceRecords()
+  const { data, loading, error } = useAttendanceRecordsPaginated(
+    currentPage, 
+    pageSize, 
+    searchTerm, 
+    dateFilter
+  )
 
-  const attendance = data || []
+  const attendance = data?.records || []
+  const pagination = data?.pagination
 
-  const filteredAttendance = attendance.filter((record) => {
-    // Safety check for record existence and required properties
-    if (!record || !record.rfid) return false;
-    
-    const name = getUserName(record)
-    const matchesSearch =
-      name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.rfid.toLowerCase().includes(searchTerm.toLowerCase())
-    return matchesSearch
-  })
+  // Reset to first page when search, date filter, or page size changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, dateFilter, pageSize])
 
   const handleExport = () => {
     const csv = [
       ["Name", "RFID", "Date", "Time", "Type"], 
-      ...filteredAttendance.filter(r => r && r.rfid).map((r) => [
+      ...attendance.filter(r => r && r.rfid).map((r) => [
         getUserName(r),
         r.rfid, 
         new Date(r.timestamp).toLocaleDateString(),
@@ -46,6 +58,119 @@ export function AttendanceTable() {
     a.href = url
     a.download = "attendance.csv"
     a.click()
+  }
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+  }
+
+  const renderPaginationItems = () => {
+    if (!pagination) return null
+
+    const { currentPage: page, totalPages } = pagination
+    const items = []
+
+    // Previous button
+    items.push(
+      <PaginationItem key="prev">
+        <PaginationPrevious 
+          href="#"
+          onClick={(e) => {
+            e.preventDefault()
+            if (page > 1) handlePageChange(page - 1)
+          }}
+          className={page <= 1 ? "pointer-events-none opacity-50" : ""}
+        />
+      </PaginationItem>
+    )
+
+    // Page numbers
+    const maxVisiblePages = 5
+    let startPage = Math.max(1, page - Math.floor(maxVisiblePages / 2))
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1)
+
+    if (endPage - startPage + 1 < maxVisiblePages) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1)
+    }
+
+    if (startPage > 1) {
+      items.push(
+        <PaginationItem key="first">
+          <PaginationLink 
+            href="#"
+            onClick={(e) => {
+              e.preventDefault()
+              handlePageChange(1)
+            }}
+          >
+            1
+          </PaginationLink>
+        </PaginationItem>
+      )
+      if (startPage > 2) {
+        items.push(
+          <PaginationItem key="ellipsis1">
+            <PaginationEllipsis />
+          </PaginationItem>
+        )
+      }
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      items.push(
+        <PaginationItem key={i}>
+          <PaginationLink 
+            href="#"
+            onClick={(e) => {
+              e.preventDefault()
+              handlePageChange(i)
+            }}
+            isActive={i === page}
+          >
+            {i}
+          </PaginationLink>
+        </PaginationItem>
+      )
+    }
+
+    if (endPage < totalPages) {
+      if (endPage < totalPages - 1) {
+        items.push(
+          <PaginationItem key="ellipsis2">
+            <PaginationEllipsis />
+          </PaginationItem>
+        )
+      }
+      items.push(
+        <PaginationItem key="last">
+          <PaginationLink 
+            href="#"
+            onClick={(e) => {
+              e.preventDefault()
+              handlePageChange(totalPages)
+            }}
+          >
+            {totalPages}
+          </PaginationLink>
+        </PaginationItem>
+      )
+    }
+
+    // Next button
+    items.push(
+      <PaginationItem key="next">
+        <PaginationNext 
+          href="#"
+          onClick={(e) => {
+            e.preventDefault()
+            if (page < totalPages) handlePageChange(page + 1)
+          }}
+          className={page >= totalPages ? "pointer-events-none opacity-50" : ""}
+        />
+      </PaginationItem>
+    )
+
+    return items
   }
 
   if (loading) {
@@ -109,6 +234,20 @@ export function AttendanceTable() {
             className="pl-10 bg-input border-border/50 focus:border-primary"
           />
         </div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground whitespace-nowrap">Show:</span>
+          <Select value={pageSize.toString()} onValueChange={(value) => setPageSize(parseInt(value))}>
+            <SelectTrigger className="w-20">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="5">5</SelectItem>
+              <SelectItem value="10">10</SelectItem>
+              <SelectItem value="20">20</SelectItem>
+              <SelectItem value="50">50</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         <Button onClick={handleExport} variant="outline" className="gap-2 bg-transparent">
           <Download className="w-4 h-4" />
           Export
@@ -129,7 +268,7 @@ export function AttendanceTable() {
               </tr>
             </thead>
             <tbody>
-              {filteredAttendance.map((record) => (
+              {attendance.map((record) => (
                 <tr key={record._id} className="border-b border-border/50 hover:bg-secondary/20 transition-colors">
                   <td className="px-6 py-4 text-sm text-foreground font-medium">
                     {getUserName(record)}
@@ -157,18 +296,29 @@ export function AttendanceTable() {
         </div>
       </Card>
 
+      {/* Pagination */}
+      {pagination && pagination.totalPages > 1 && (
+        <div className="flex justify-center">
+          <Pagination>
+            <PaginationContent>
+              {renderPaginationItems()}
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
+
       {/* Summary */}
       <Card className="border border-border/50 bg-card/50 backdrop-blur-sm">
         <div className="p-6">
           <div className="grid grid-cols-3 gap-4">
             <div>
               <p className="text-sm text-muted-foreground mb-1">Total Records</p>
-              <p className="text-2xl font-bold text-foreground">{filteredAttendance.length}</p>
+              <p className="text-2xl font-bold text-foreground">{pagination?.totalRecords || 0}</p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground mb-1">Unique Users</p>
+              <p className="text-sm text-muted-foreground mb-1">Current Page</p>
               <p className="text-2xl font-bold text-foreground">
-                {new Set(filteredAttendance.map((r) => r.rfid)).size}
+                {pagination?.currentPage || 1} of {pagination?.totalPages || 1}
               </p>
             </div>
             <div>

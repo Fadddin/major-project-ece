@@ -222,6 +222,74 @@ export function useAttendanceRecords() {
   return { data, loading, error, refetch };
 }
 
+export function useAttendanceRecordsPaginated(page = 1, limit = 10, search = '', dateFilter = '') {
+  const [data, setData] = useState<{
+    records: AttendanceRecord[];
+    pagination: {
+      currentPage: number;
+      totalPages: number;
+      totalRecords: number;
+      limit: number;
+      hasNextPage: boolean;
+      hasPrevPage: boolean;
+    };
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchRecords = async () => {
+      try {
+        setLoading(true);
+        const params = new URLSearchParams({
+          page: page.toString(),
+          limit: limit.toString(),
+          ...(search && { search }),
+          ...(dateFilter && { date: dateFilter })
+        });
+        
+        const response = await fetch(`/api/attendance/records?${params}`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch attendance records');
+        }
+        const result = await response.json();
+        setData(result.data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An error occurred');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRecords();
+  }, [page, limit, search, dateFilter]);
+
+  const refetch = async () => {
+    try {
+      setLoading(true);
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+        ...(search && { search }),
+        ...(dateFilter && { date: dateFilter })
+      });
+      
+      const response = await fetch(`/api/attendance/records?${params}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch attendance records');
+      }
+      const result = await response.json();
+      setData(result.data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { data, loading, error, refetch };
+}
+
 // API functions
 export async function registerUser(userData: { rfid: string; name: string; employeeId: string }) {
   const response = await fetch('/api/users/register', {
