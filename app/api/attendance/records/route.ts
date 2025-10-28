@@ -64,14 +64,30 @@ export async function GET(request: NextRequest) {
       userMap.set(user.rfid, user.name);
     });
 
-    // Map attendance records with user names
-    const recordsWithNames = attendanceRecords.map(record => ({
-      _id: record._id,
-      rfid: record.rfid,
-      userName: userMap.get(record.rfid) || 'Unknown User',
-      timestamp: record.timestamp,
-      type: record.type,
-    }));
+    // Map attendance records with user names and subject data
+    const recordsWithNames = attendanceRecords.map(record => {
+      console.log('Processing attendance record:', {
+        _id: record._id,
+        rfid: record.rfid,
+        subjectId: record.subjectId,
+        subjectName: record.subjectName,
+        courseCode: record.courseCode,
+        instructor: record.instructor,
+        timestamp: record.timestamp
+      });
+      
+      return {
+        _id: record._id,
+        rfid: record.rfid,
+        userName: userMap.get(record.rfid) || 'Unknown User',
+        timestamp: record.timestamp,
+        type: record.type,
+        subjectId: record.subjectId,
+        subjectName: record.subjectName,
+        courseCode: record.courseCode,
+        instructor: record.instructor,
+      };
+    });
 
     return NextResponse.json({
       success: true,

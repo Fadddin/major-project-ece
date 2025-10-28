@@ -3,6 +3,7 @@ import connectDB from '@/lib/mongodb';
 import { User } from '@/models/User';
 import { UnregisteredUser } from '@/models/UnregisteredUser';
 import { AttendanceRecord } from '@/models/AttendanceRecord';
+import { SelectedSubject } from '@/models/SelectedSubject';
 import mongoose from 'mongoose';
 
 // CORS headers for cross-origin requests
@@ -37,6 +38,15 @@ export async function POST(request: NextRequest) {
     // Parse the provided timestamp or use current time as fallback
     const recordTimestamp = timestamp ? new Date(timestamp) : new Date();
 
+    // Get selected subject if any
+    const selectedSubject = await SelectedSubject.findOne();
+    console.log('Selected Subject Query Result:', selectedSubject);
+    console.log('Selected Subject Count:', await SelectedSubject.countDocuments());
+    
+    // Debug: Check all selected subjects
+    const allSelectedSubjects = await SelectedSubject.find();
+    console.log('All Selected Subjects:', allSelectedSubjects);
+
     // Check if user exists
     const user = await User.findOne({ rfid });
     
@@ -45,14 +55,36 @@ export async function POST(request: NextRequest) {
       user.attendance += 1;
       await user.save();
 
-      // Create attendance record
-      const attendanceRecord = new AttendanceRecord({
+      // Create attendance record with subject data if available
+      const attendanceRecordData: any = {
         rfid,
         userId: new mongoose.Types.ObjectId(user._id),
         timestamp: recordTimestamp,
         type: 'check-in', // You can modify this logic based on your requirements
-      });
+      };
+
+      // Add subject data if selected subject exists
+      if (selectedSubject) {
+        console.log('Adding subject data to attendance record:', {
+          subjectId: selectedSubject.subjectId,
+          subjectName: selectedSubject.subjectName,
+          courseCode: selectedSubject.courseCode,
+          instructor: selectedSubject.instructor
+        });
+        attendanceRecordData.subjectId = new mongoose.Types.ObjectId(selectedSubject.subjectId);
+        attendanceRecordData.subjectName = selectedSubject.subjectName;
+        attendanceRecordData.courseCode = selectedSubject.courseCode;
+        attendanceRecordData.instructor = selectedSubject.instructor;
+      } else {
+        console.log('No selected subject found, creating record without subject data');
+      }
+
+      console.log('Final attendance record data:', attendanceRecordData);
+      const attendanceRecord = new AttendanceRecord(attendanceRecordData);
+      console.log('Created attendance record before save:', attendanceRecord);
+      console.log('Attendance record toObject():', attendanceRecord.toObject());
       await attendanceRecord.save();
+      console.log('Attendance record after save:', await AttendanceRecord.findById(attendanceRecord._id));
 
       return NextResponse.json({
         success: true,
@@ -83,12 +115,32 @@ export async function POST(request: NextRequest) {
         await unregisteredUser.save();
       }
 
-      // Create attendance record for unregistered user
-      const attendanceRecord = new AttendanceRecord({
+      // Create attendance record for unregistered user with subject data if available
+      const attendanceRecordData: any = {
         rfid,
         timestamp: recordTimestamp,
         type: 'check-in',
-      });
+      };
+
+      // Add subject data if selected subject exists
+      if (selectedSubject) {
+        console.log('Adding subject data to unregistered user attendance record:', {
+          subjectId: selectedSubject.subjectId,
+          subjectName: selectedSubject.subjectName,
+          courseCode: selectedSubject.courseCode,
+          instructor: selectedSubject.instructor
+        });
+        attendanceRecordData.subjectId = new mongoose.Types.ObjectId(selectedSubject.subjectId);
+        attendanceRecordData.subjectName = selectedSubject.subjectName;
+        attendanceRecordData.courseCode = selectedSubject.courseCode;
+        attendanceRecordData.instructor = selectedSubject.instructor;
+      } else {
+        console.log('No selected subject found for unregistered user, creating record without subject data');
+      }
+
+      console.log('Final unregistered user attendance record data:', attendanceRecordData);
+      const attendanceRecord = new AttendanceRecord(attendanceRecordData);
+      console.log('Created unregistered user attendance record:', attendanceRecord);
       await attendanceRecord.save();
 
       return NextResponse.json({

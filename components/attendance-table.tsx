@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Search, Download, Filter, Loader2 } from "lucide-react"
+import { Search, Download, Filter, Loader2, BookOpen, X } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -15,7 +15,7 @@ import {
   PaginationPrevious, 
   PaginationEllipsis 
 } from "@/components/ui/pagination"
-import { useAttendanceRecordsPaginated, getUserName } from "@/hooks/use-api"
+import { useAttendanceRecordsPaginated, useSubjects, useSelectedSubject, selectSubject, clearSelectedSubject, getUserName } from "@/hooks/use-api"
 
 export function AttendanceTable() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -29,9 +29,22 @@ export function AttendanceTable() {
     searchTerm, 
     dateFilter
   )
+  const { data: subjects } = useSubjects()
+  const { data: selectedSubject, refetch: refetchSelectedSubject } = useSelectedSubject()
 
   const attendance = data?.records || []
   const pagination = data?.pagination
+
+  // Debug logging
+  console.log('Subjects data:', subjects)
+  console.log('Selected subject data:', selectedSubject)
+  console.log('Attendance records:', attendance)
+  console.log('First attendance record subject data:', attendance[0] ? {
+    subjectName: attendance[0].subjectName,
+    courseCode: attendance[0].courseCode,
+    instructor: attendance[0].instructor,
+    subjectId: attendance[0].subjectId
+  } : 'No records')
 
   // Reset to first page when search, date filter, or page size changes
   useEffect(() => {
@@ -40,10 +53,13 @@ export function AttendanceTable() {
 
   const handleExport = () => {
     const csv = [
-      ["Name", "RFID", "Date", "Time", "Type"], 
+      ["Name", "RFID", "Subject", "Course Code", "Instructor", "Date", "Time", "Type"], 
       ...attendance.filter(r => r && r.rfid).map((r) => [
         getUserName(r),
-        r.rfid, 
+        r.rfid,
+        r.subjectName || "No subject",
+        r.courseCode || "",
+        r.instructor || "",
         new Date(r.timestamp).toLocaleDateString(),
         new Date(r.timestamp).toLocaleTimeString(),
         r.type
@@ -62,6 +78,28 @@ export function AttendanceTable() {
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
+  }
+
+  const handleSubjectSelect = async (subjectId: string) => {
+    console.log('Selecting subject with ID:', subjectId)
+    try {
+      const result = await selectSubject(subjectId)
+      console.log('Subject selection result:', result)
+      refetchSelectedSubject()
+    } catch (error) {
+      console.error('Error selecting subject:', error)
+      alert('Error selecting subject: ' + (error instanceof Error ? error.message : 'Unknown error'))
+    }
+  }
+
+  const handleClearSubject = async () => {
+    try {
+      await clearSelectedSubject()
+      refetchSelectedSubject()
+    } catch (error) {
+      console.error('Error clearing subject:', error)
+      alert('Error clearing subject: ' + (error instanceof Error ? error.message : 'Unknown error'))
+    }
   }
 
   const renderPaginationItems = () => {
@@ -214,6 +252,65 @@ export function AttendanceTable() {
         <p className="text-muted-foreground">View and filter attendance records.</p>
       </div>
 
+      {/* Subject Selection */}
+      <Card className="border border-border/50 bg-card/50 backdrop-blur-sm">
+        <div className="p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <BookOpen className="w-5 h-5 text-primary" />
+            <h2 className="text-lg font-semibold text-foreground">Current Subject</h2>
+          </div>
+          
+          {selectedSubject ? (
+            <div className="flex items-center justify-between p-4 bg-secondary/30 rounded-lg">
+              <div>
+                <p className="font-medium text-foreground">{selectedSubject.subjectName}</p>
+                <p className="text-sm text-muted-foreground">
+                  {selectedSubject.courseCode} • {selectedSubject.instructor}
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleClearSubject}
+                className="text-destructive hover:bg-destructive/10"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-muted-foreground">No subject selected. Choose a subject to track attendance:</p>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex-1">
+                  <Select onValueChange={handleSubjectSelect}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select a subject..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {subjects?.map((subject) => (
+                        <SelectItem key={subject._id} value={subject._id}>
+                          {subject.name} ({subject.courseCode}) - {subject.instructor}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {subjects?.length === 0 && (
+                  <Button
+                    variant="outline"
+                    onClick={() => window.open('/dashboard/subjects', '_blank')}
+                    className="gap-2"
+                  >
+                    <BookOpen className="w-4 h-4" />
+                    Manage Subjects
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </Card>
+
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="flex-1 relative">
@@ -262,6 +359,7 @@ export function AttendanceTable() {
               <tr className="border-b border-border/50 bg-secondary/30">
                 <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Name</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">RFID</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Subject</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Date</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Time</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Status</th>
@@ -274,6 +372,18 @@ export function AttendanceTable() {
                     {getUserName(record)}
                   </td>
                   <td className="px-6 py-4 text-sm text-muted-foreground font-mono">{record.rfid}</td>
+                  <td className="px-6 py-4 text-sm text-foreground">
+                    {record.subjectName ? (
+                      <div>
+                        <div className="font-medium">{record.subjectName}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {record.courseCode} • {record.instructor}
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">No subject</span>
+                    )}
+                  </td>
                   <td className="px-6 py-4 text-sm text-foreground">
                     {new Date(record.timestamp).toLocaleDateString()}
                   </td>

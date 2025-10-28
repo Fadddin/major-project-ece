@@ -2,12 +2,13 @@
 
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { BarChart3, Users, Clock, AlertCircle, User, LogOut, Home } from "lucide-react"
+import { BarChart3, Users, Clock, AlertCircle, User, LogOut, Home, BookOpen } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: Home },
   { href: "/dashboard/users", label: "Users", icon: Users },
+  { href: "/dashboard/subjects", label: "Subjects", icon: BookOpen },
   { href: "/dashboard/attendance", label: "Attendance", icon: Clock },
   { href: "/dashboard/unregistered", label: "Unregistered", icon: AlertCircle },
   { href: "/dashboard/profile", label: "Profile", icon: User },
