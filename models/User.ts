@@ -4,7 +4,8 @@ export interface IUser extends Document {
   userId?: mongoose.Types.ObjectId;
   rfid: string;
   name: string;
-  employeeId: string;
+  employeeId?: string;
+  email?: string;
   attendance: number;
   createdAt: Date;
 }
@@ -25,8 +26,15 @@ const UserSchema = new Schema<IUser>({
   },
   employeeId: {
     type: String,
-    required: true,
+    required: false,
     unique: true,
+    sparse: true, // Allows multiple null values
+  },
+  email: {
+    type: String,
+    required: false,
+    unique: true,
+    sparse: true, // Allows multiple null values
   },
   attendance: {
     type: Number,

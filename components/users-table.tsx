@@ -7,7 +7,7 @@ import { Search, Plus, Edit2, Trash2, Loader2 } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { useUsers, registerUser, type User } from "@/hooks/use-api"
+import { useUsers, registerUser, updateUser, deleteUser, type User } from "@/hooks/use-api"
 
 export function UsersTable() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -15,7 +15,11 @@ export function UsersTable() {
   const limit = 20
   const { data, loading, error, refetch } = useUsers(page, limit)
   const [showModal, setShowModal] = useState(false)
-  const [formData, setFormData] = useState({ name: "", rfid: "", employeeId: "" })
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [formData, setFormData] = useState({ name: "", rfid: "", employeeId: "", email: "" })
+  const [editData, setEditData] = useState({ id: "", name: "", employeeId: "", email: "" })
+  const [deleteUserId, setDeleteUserId] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const users = data?.users || []
@@ -25,21 +29,82 @@ export function UsersTable() {
     (user) =>
       user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.rfid.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.employeeId.toLowerCase().includes(searchTerm.toLowerCase()),
+      (user.employeeId && user.employeeId.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (user.email && user.email.toLowerCase().includes(searchTerm.toLowerCase())),
   )
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (formData.name && formData.rfid && formData.employeeId) {
+    if (formData.name && formData.rfid) {
       try {
         setIsSubmitting(true)
-        await registerUser(formData)
-        setFormData({ name: "", rfid: "", employeeId: "" })
+        await registerUser({
+          name: formData.name,
+          rfid: formData.rfid,
+          employeeId: formData.employeeId || undefined,
+          email: formData.email || undefined,
+        })
+        setFormData({ name: "", rfid: "", employeeId: "", email: "" })
         setShowModal(false)
         refetch() // Refresh the data
       } catch (error) {
         console.error('Error registering user:', error)
         alert('Error registering user: ' + (error instanceof Error ? error.message : 'Unknown error'))
+      } finally {
+        setIsSubmitting(false)
+      }
+    }
+  }
+
+  const handleEditUser = (user: User) => {
+    setEditData({
+      id: user._id,
+      name: user.name,
+      employeeId: user.employeeId || "",
+      email: user.email || "",
+    })
+    setShowEditModal(true)
+  }
+
+  const handleUpdateUser = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (editData.name) {
+      try {
+        setIsSubmitting(true)
+        await updateUser({
+          id: editData.id,
+          name: editData.name,
+          employeeId: editData.employeeId || undefined,
+          email: editData.email || undefined,
+        })
+        setEditData({ id: "", name: "", employeeId: "", email: "" })
+        setShowEditModal(false)
+        refetch() // Refresh the data
+      } catch (error) {
+        console.error('Error updating user:', error)
+        alert('Error updating user: ' + (error instanceof Error ? error.message : 'Unknown error'))
+      } finally {
+        setIsSubmitting(false)
+      }
+    }
+  }
+
+  const handleDeleteUser = (userId: string) => {
+    setDeleteUserId(userId)
+    setShowDeleteDialog(true)
+  }
+
+  const confirmDeleteUser = async () => {
+    if (deleteUserId) {
+      try {
+        setIsSubmitting(true)
+        await deleteUser(deleteUserId)
+        setDeleteUserId(null)
+        setShowDeleteDialog(false)
+        refetch() // Refresh the data
+      } catch (error) {
+        console.error('Error deleting user:', error)
+        alert('Error deleting user: ' + (error instanceof Error ? error.message : 'Unknown error'))
       } finally {
         setIsSubmitting(false)
       }
@@ -92,7 +157,7 @@ export function UsersTable() {
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Search by name or RFID..."
+            placeholder="Search by name, RFID, employee ID, or email..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10 bg-input border-border/50 focus:border-primary"
@@ -116,6 +181,7 @@ export function UsersTable() {
                 <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Name</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">RFID</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Employee ID</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Email</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Attendance</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Created</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Actions</th>
@@ -126,19 +192,26 @@ export function UsersTable() {
                 <tr key={user._id} className="border-b border-border/50 hover:bg-secondary/20 transition-colors">
                   <td className="px-6 py-4 text-sm text-foreground font-medium">{user.name}</td>
                   <td className="px-6 py-4 text-sm text-muted-foreground font-mono">{user.rfid}</td>
-                  <td className="px-6 py-4 text-sm text-foreground">{user.employeeId}</td>
+                  <td className="px-6 py-4 text-sm text-foreground">{user.employeeId || '-'}</td>
+                  <td className="px-6 py-4 text-sm text-foreground">{user.email || '-'}</td>
                   <td className="px-6 py-4 text-sm text-foreground font-medium">{user.attendance}</td>
                   <td className="px-6 py-4 text-sm text-muted-foreground">
                     {new Date(user.createdAt).toLocaleDateString()}
                   </td>
                   <td className="px-6 py-4 text-sm flex gap-2">
-                    <Button variant="ghost" size="sm" className="text-primary hover:bg-primary/10">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="text-primary hover:bg-primary/10"
+                      onClick={() => handleEditUser(user)}
+                    >
                       <Edit2 className="w-4 h-4" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="sm"
                       className="text-destructive hover:bg-destructive/10"
+                      onClick={() => handleDeleteUser(user._id)}
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
@@ -158,29 +231,41 @@ export function UsersTable() {
               <h2 className="text-xl font-bold text-foreground mb-4">Add New User</h2>
               <form onSubmit={handleAddUser} className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium text-foreground mb-2 block">Name</label>
+                  <label className="text-sm font-medium text-foreground mb-2 block">Name *</label>
                   <Input
                     placeholder="John Doe"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     className="bg-input border-border/50"
+                    required
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-foreground mb-2 block">RFID</label>
+                  <label className="text-sm font-medium text-foreground mb-2 block">RFID *</label>
                   <Input
                     placeholder="RF006"
                     value={formData.rfid}
                     onChange={(e) => setFormData({ ...formData, rfid: e.target.value })}
                     className="bg-input border-border/50"
+                    required
                   />
                 </div>
                 <div>
                   <label className="text-sm font-medium text-foreground mb-2 block">Employee ID</label>
                   <Input
-                    placeholder="EMP001"
+                    placeholder="EMP001 (optional)"
                     value={formData.employeeId}
                     onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
+                    className="bg-input border-border/50"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-foreground mb-2 block">Email</label>
+                  <Input
+                    type="email"
+                    placeholder="john@company.com (optional)"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     className="bg-input border-border/50"
                   />
                 </div>
@@ -204,6 +289,109 @@ export function UsersTable() {
                   </Button>
                 </div>
               </form>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Edit User Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <Card className="w-full max-w-md border border-border/50">
+            <div className="p-6">
+              <h2 className="text-xl font-bold text-foreground mb-4">Edit User</h2>
+              <form onSubmit={handleUpdateUser} className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium text-foreground mb-2 block">Name *</label>
+                  <Input
+                    placeholder="John Doe"
+                    value={editData.name}
+                    onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                    className="bg-input border-border/50"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-foreground mb-2 block">Employee ID</label>
+                  <Input
+                    placeholder="EMP001 (optional)"
+                    value={editData.employeeId}
+                    onChange={(e) => setEditData({ ...editData, employeeId: e.target.value })}
+                    className="bg-input border-border/50"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-foreground mb-2 block">Email</label>
+                  <Input
+                    type="email"
+                    placeholder="john@company.com (optional)"
+                    value={editData.email}
+                    onChange={(e) => setEditData({ ...editData, email: e.target.value })}
+                    className="bg-input border-border/50"
+                  />
+                </div>
+                <div className="flex gap-3 pt-4">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setShowEditModal(false)} 
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                        Updating...
+                      </>
+                    ) : (
+                      'Update User'
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {showDeleteDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <Card className="w-full max-w-md border border-border/50">
+            <div className="p-6">
+              <h2 className="text-xl font-bold text-foreground mb-4">Delete User</h2>
+              <p className="text-muted-foreground mb-6">
+                Are you sure you want to delete this user? This action cannot be undone.
+              </p>
+              <div className="flex gap-3">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowDeleteDialog(false)} 
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={confirmDeleteUser}
+                  className="flex-1 bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      Deleting...
+                    </>
+                  ) : (
+                    'Delete User'
+                  )}
+                </Button>
+              </div>
             </div>
           </Card>
         </div>

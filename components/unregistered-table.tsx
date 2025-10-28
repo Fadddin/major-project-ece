@@ -15,24 +15,25 @@ export function UnregisteredTable() {
   const { data, loading, error, refetch } = useUnregisteredUsers(page, limit)
   const [showModal, setShowModal] = useState(false)
   const [selectedRfid, setSelectedRfid] = useState<string | null>(null)
-  const [formData, setFormData] = useState({ name: "", employeeId: "" })
+  const [formData, setFormData] = useState({ name: "", employeeId: "", email: "" })
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const unregistered = data?.unregisteredUsers || []
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (selectedRfid && formData.name && formData.employeeId) {
+    if (selectedRfid && formData.name) {
       try {
         setIsSubmitting(true)
         await registerUser({
           rfid: selectedRfid,
           name: formData.name,
-          employeeId: formData.employeeId,
+          employeeId: formData.employeeId || undefined,
+          email: formData.email || undefined,
         })
         
         // Reset form
-        setFormData({ name: "", employeeId: "" })
+        setFormData({ name: "", employeeId: "", email: "" })
         setSelectedRfid(null)
         setShowModal(false)
         refetch() // Refresh the data
@@ -161,20 +162,31 @@ export function UnregisteredTable() {
               <p className="text-sm text-muted-foreground mb-4">RFID: {selectedRfid}</p>
               <form onSubmit={handleRegister} className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium text-foreground mb-2 block">Employee Name</label>
+                  <label className="text-sm font-medium text-foreground mb-2 block">Employee Name *</label>
                   <Input
                     placeholder="John Doe"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     className="bg-input border-border/50"
+                    required
                   />
                 </div>
                 <div>
                   <label className="text-sm font-medium text-foreground mb-2 block">Employee ID</label>
                   <Input
-                    placeholder="EMP001"
+                    placeholder="EMP001 (optional)"
                     value={formData.employeeId}
                     onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
+                    className="bg-input border-border/50"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-foreground mb-2 block">Email</label>
+                  <Input
+                    type="email"
+                    placeholder="john@company.com (optional)"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     className="bg-input border-border/50"
                   />
                 </div>

@@ -7,23 +7,33 @@ export async function POST(request: NextRequest) {
   try {
     await connectDB();
 
-    const { rfid, name, employeeId } = await request.json();
+    const { rfid, name, employeeId, email } = await request.json();
 
-    if (!rfid || !name || !employeeId) {
+    if (!rfid || !name) {
       return NextResponse.json(
-        { error: 'RFID, name, and employeeId are required' },
+        { error: 'RFID and name are required' },
         { status: 400 }
       );
     }
 
     // Check if user already exists
+    const existingUserQuery: any = [{ rfid }];
+    if (employeeId) existingUserQuery.push({ employeeId });
+    if (email) existingUserQuery.push({ email });
+
     const existingUser = await User.findOne({
-      $or: [{ rfid }, { employeeId }],
+      $or: existingUserQuery,
     });
 
     if (existingUser) {
+      let errorMessage = 'User with this RFID already exists';
+      if (existingUser.employeeId === employeeId && employeeId) {
+        errorMessage = 'User with this Employee ID already exists';
+      } else if (existingUser.email === email && email) {
+        errorMessage = 'User with this email already exists';
+      }
       return NextResponse.json(
-        { error: 'User with this RFID or Employee ID already exists' },
+        { error: errorMessage },
         { status: 400 }
       );
     }
@@ -32,12 +42,16 @@ export async function POST(request: NextRequest) {
     const unregisteredUser = await UnregisteredUser.findOne({ rfid });
 
     // Create new user
-    const user = new User({
+    const userData: any = {
       rfid,
       name,
-      employeeId,
       attendance: 0,
-    });
+    };
+    
+    if (employeeId) userData.employeeId = employeeId;
+    if (email) userData.email = email;
+
+    const user = new User(userData);
 
     await user.save();
 
@@ -54,6 +68,7 @@ export async function POST(request: NextRequest) {
         rfid: user.rfid,
         name: user.name,
         employeeId: user.employeeId,
+        email: user.email,
         attendance: user.attendance,
         createdAt: user.createdAt,
       },

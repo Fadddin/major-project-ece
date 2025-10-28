@@ -5,7 +5,8 @@ export interface User {
   _id: string;
   rfid: string;
   name: string;
-  employeeId: string;
+  employeeId?: string;
+  email?: string;
   attendance: number;
   createdAt: string;
 }
@@ -291,7 +292,7 @@ export function useAttendanceRecordsPaginated(page = 1, limit = 10, search = '',
 }
 
 // API functions
-export async function registerUser(userData: { rfid: string; name: string; employeeId: string }) {
+export async function registerUser(userData: { rfid: string; name: string; employeeId?: string; email?: string }) {
   const response = await fetch('/api/users/register', {
     method: 'POST',
     headers: {
@@ -320,6 +321,36 @@ export async function recordAttendance(rfid: string) {
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.error || 'Failed to record attendance');
+  }
+
+  return response.json();
+}
+
+export async function updateUser(userData: { id: string; name: string; employeeId?: string; email?: string }) {
+  const response = await fetch('/api/users', {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(userData),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to update user');
+  }
+
+  return response.json();
+}
+
+export async function deleteUser(id: string) {
+  const response = await fetch(`/api/users?id=${id}`, {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to delete user');
   }
 
   return response.json();
