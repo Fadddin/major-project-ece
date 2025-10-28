@@ -20,6 +20,7 @@ export interface UnregisteredUser {
 export interface AttendanceRecord {
   _id: string;
   rfid: string;
+  userName?: string;
   userId?: string | {
     _id?: string;
     name?: string;
@@ -177,8 +178,8 @@ export function useUnregisteredUsers(page = 1, limit = 10) {
   return { data, loading, error, refetch };
 }
 
-export function useAttendanceRecords(page = 1, limit = 10, startDate?: string, endDate?: string, userId?: string) {
-  const [data, setData] = useState<{ records: AttendanceRecord[]; pagination: any; stats: any } | null>(null);
+export function useAttendanceRecords() {
+  const [data, setData] = useState<AttendanceRecord[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -186,15 +187,7 @@ export function useAttendanceRecords(page = 1, limit = 10, startDate?: string, e
     const fetchRecords = async () => {
       try {
         setLoading(true);
-        const params = new URLSearchParams({
-          page: page.toString(),
-          limit: limit.toString(),
-          ...(startDate && { startDate }),
-          ...(endDate && { endDate }),
-          ...(userId && { userId }),
-        });
-        
-        const response = await fetch(`/api/attendance/records?${params}`);
+        const response = await fetch(`/api/attendance/records`);
         if (!response.ok) {
           throw new Error('Failed to fetch attendance records');
         }
@@ -208,20 +201,12 @@ export function useAttendanceRecords(page = 1, limit = 10, startDate?: string, e
     };
 
     fetchRecords();
-  }, [page, limit, startDate, endDate, userId]);
+  }, []);
 
   const refetch = async () => {
     try {
       setLoading(true);
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: limit.toString(),
-        ...(startDate && { startDate }),
-        ...(endDate && { endDate }),
-        ...(userId && { userId }),
-      });
-      
-      const response = await fetch(`/api/attendance/records?${params}`);
+      const response = await fetch(`/api/attendance/records`);
       if (!response.ok) {
         throw new Error('Failed to fetch attendance records');
       }
@@ -274,6 +259,9 @@ export async function recordAttendance(rfid: string) {
 
 // Helper function to get user name from attendance record
 export function getUserName(record: AttendanceRecord): string {
+  if (record.userName) {
+    return record.userName;
+  }
   if (typeof record.userId === 'object' && record.userId?.name) {
     return record.userId.name;
   }

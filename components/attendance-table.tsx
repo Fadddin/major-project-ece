@@ -10,13 +10,10 @@ import { useAttendanceRecords, getUserName } from "@/hooks/use-api"
 export function AttendanceTable() {
   const [searchTerm, setSearchTerm] = useState("")
   const [dateFilter, setDateFilter] = useState("")
-  const [page, setPage] = useState(1)
-  const limit = 20
 
-  const { data, loading, error } = useAttendanceRecords(page, limit, dateFilter || undefined)
+  const { data, loading, error } = useAttendanceRecords()
 
-  const attendance = data?.records || []
-  const pagination = data?.pagination
+  const attendance = data || []
 
   const filteredAttendance = attendance.filter((record) => {
     // Safety check for record existence and required properties
@@ -166,7 +163,7 @@ export function AttendanceTable() {
           <div className="grid grid-cols-3 gap-4">
             <div>
               <p className="text-sm text-muted-foreground mb-1">Total Records</p>
-              <p className="text-2xl font-bold text-foreground">{pagination?.total || 0}</p>
+              <p className="text-2xl font-bold text-foreground">{filteredAttendance.length}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground mb-1">Unique Users</p>
@@ -182,32 +179,6 @@ export function AttendanceTable() {
         </div>
       </Card>
 
-      {/* Pagination */}
-      {pagination && pagination.pages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            Showing {((page - 1) * limit) + 1} to {Math.min(page * limit, pagination.total)} of {pagination.total} records
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage(page - 1)}
-              disabled={page === 1}
-            >
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage(page + 1)}
-              disabled={page >= pagination.pages}
-            >
-              Next
-            </Button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
