@@ -26,17 +26,19 @@ export async function POST(request: NextRequest) {
   try {
     await connectDB();
 
-    const { rfid, timestamp } = await request.json();
+    const { rfid, fingerId } = await request.json();
+    console.log("gotten rfid and fingerId", rfid, fingerId);
 
-    if (!rfid) {
+    // Validate that at least one identifier is provided
+    if (!rfid && !fingerId) {
       return NextResponse.json(
-        { error: 'RFID is required' },
+        { error: 'Either RFID or fingerId is required' },
         { status: 400, headers: corsHeaders }
       );
     }
 
-    // Parse the provided timestamp or use current time as fallback
-    const recordTimestamp = timestamp ? new Date(timestamp) : new Date();
+    // Use current time for the record
+    const recordTimestamp = new Date();
 
     // Get selected subject if any
     const selectedSubject = await SelectedSubject.findOne();
@@ -47,8 +49,55 @@ export async function POST(request: NextRequest) {
     const allSelectedSubjects = await SelectedSubject.find();
     console.log('All Selected Subjects:', allSelectedSubjects);
 
-    // Check if user exists
-    const user = await User.findOne({ rfid });
+    // Search for user by rfid or fingerId
+    const searchQuery: any = {};
+    if (rfid && fingerId) {
+      // If both are provided, search for either
+      searchQuery.$or = [{ rfid }, { fingerId }];
+    } else if (rfid) {
+      searchQuery.rfid = rfid;
+    } else if (fingerId) {
+      searchQuery.fingerId = fingerId;
+    }
+
+    const user = await User.findOne(searchQuery);
+    
+    // If both rfid and fingerId are present and no user found, this is a registration request
+    if (rfid && fingerId && !user) {
+      // Registration request - create new unregistered user
+      let unregisteredUser = await UnregisteredUser.findOne({ 
+        $or: [{ rfid }, { fingerId }] 
+      });
+      
+      if (unregisteredUser) {
+        // Update existing unregistered user with both fields
+        if (!unregisteredUser.rfid && rfid) unregisteredUser.rfid = rfid;
+        if (!unregisteredUser.fingerId && fingerId) unregisteredUser.fingerId = fingerId;
+        unregisteredUser.scannedCount += 1;
+        unregisteredUser.lastSeen = recordTimestamp;
+        await unregisteredUser.save();
+      } else {
+        // Create new unregistered user with both rfid and fingerId
+        unregisteredUser = new UnregisteredUser({
+          rfid,
+          fingerId,
+          lastSeen: recordTimestamp,
+          scannedCount: 1,
+        });
+        await unregisteredUser.save();
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Unregistered user registered successfully',
+        unregisteredUser: {
+          rfid: unregisteredUser.rfid,
+          fingerId: unregisteredUser.fingerId,
+          scannedCount: unregisteredUser.scannedCount,
+          lastSeen: unregisteredUser.lastSeen,
+        },
+      }, { headers: corsHeaders });
+    }
     
     if (user) {
       // User is registered - increment attendance and create record
@@ -57,11 +106,14 @@ export async function POST(request: NextRequest) {
 
       // Create attendance record with subject data if available
       const attendanceRecordData: any = {
-        rfid,
         userId: new mongoose.Types.ObjectId(user._id),
         timestamp: recordTimestamp,
-        type: 'check-in', // You can modify this logic based on your requirements
+        type: 'check-in',
       };
+
+      // Add rfid or fingerId to record if available
+      if (user.rfid) attendanceRecordData.rfid = user.rfid;
+      if (user.fingerId) attendanceRecordData.fingerId = user.fingerId;
 
       // Add subject data if selected subject exists
       if (selectedSubject) {
@@ -98,17 +150,21 @@ export async function POST(request: NextRequest) {
       }, { headers: corsHeaders });
     } else {
       // User is not registered - handle unregistered user
-      let unregisteredUser = await UnregisteredUser.findOne({ rfid });
+      let unregisteredUser = await UnregisteredUser.findOne(searchQuery);
       
       if (unregisteredUser) {
         // Update existing unregistered user
         unregisteredUser.scannedCount += 1;
         unregisteredUser.lastSeen = recordTimestamp;
+        // Update missing fields if provided
+        if (rfid && !unregisteredUser.rfid) unregisteredUser.rfid = rfid;
+        if (fingerId && !unregisteredUser.fingerId) unregisteredUser.fingerId = fingerId;
         await unregisteredUser.save();
       } else {
         // Create new unregistered user
         unregisteredUser = new UnregisteredUser({
-          rfid,
+          rfid: rfid || undefined,
+          fingerId: fingerId || undefined,
           lastSeen: recordTimestamp,
           scannedCount: 1,
         });
@@ -117,10 +173,13 @@ export async function POST(request: NextRequest) {
 
       // Create attendance record for unregistered user with subject data if available
       const attendanceRecordData: any = {
-        rfid,
         timestamp: recordTimestamp,
         type: 'check-in',
       };
+
+      // Add rfid or fingerId to record if available
+      if (rfid) attendanceRecordData.rfid = rfid;
+      if (fingerId) attendanceRecordData.fingerId = fingerId;
 
       // Add subject data if selected subject exists
       if (selectedSubject) {
@@ -148,6 +207,7 @@ export async function POST(request: NextRequest) {
         message: 'Unregistered user scanned',
         unregisteredUser: {
           rfid: unregisteredUser.rfid,
+          fingerId: unregisteredUser.fingerId,
           scannedCount: unregisteredUser.scannedCount,
           lastSeen: unregisteredUser.lastSeen,
         },
@@ -161,4 +221,15 @@ export async function POST(request: NextRequest) {
       { status: 500, headers: corsHeaders }
     );
   }
+  // return NextResponse.json({
+  //   success: true,
+  //   message: 'Unregistered user scanned',
+  //   unregisteredUser: {
+  //     rfid: "dfsd",
+  //     fingerId: "12",
+  //     scannedCount: "1",
+  //     lastSeen: "3",
+  //   },
+  //   timestamp: "643",
+  // }, { headers: corsHeaders });
 }

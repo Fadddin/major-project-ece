@@ -7,17 +7,19 @@ export async function POST(request: NextRequest) {
   try {
     await connectDB();
 
-    const { rfid, name, employeeId, email } = await request.json();
+    const { rfid, fingerId, name, employeeId, email } = await request.json();
 
-    if (!rfid || !name) {
+    if ((!rfid && !fingerId) || !name) {
       return NextResponse.json(
-        { error: 'RFID and name are required' },
+        { error: 'Either RFID or fingerId, and name are required' },
         { status: 400 }
       );
     }
 
     // Check if user already exists
-    const existingUserQuery: any = [{ rfid }];
+    const existingUserQuery: any = [];
+    if (rfid) existingUserQuery.push({ rfid });
+    if (fingerId) existingUserQuery.push({ fingerId });
     if (employeeId) existingUserQuery.push({ employeeId });
     if (email) existingUserQuery.push({ email });
 
@@ -26,8 +28,12 @@ export async function POST(request: NextRequest) {
     });
 
     if (existingUser) {
-      let errorMessage = 'User with this RFID already exists';
-      if (existingUser.employeeId === employeeId && employeeId) {
+      let errorMessage = 'User already exists';
+      if (existingUser.rfid === rfid && rfid) {
+        errorMessage = 'User with this RFID already exists';
+      } else if (existingUser.fingerId === fingerId && fingerId) {
+        errorMessage = 'User with this fingerId already exists';
+      } else if (existingUser.employeeId === employeeId && employeeId) {
         errorMessage = 'User with this Employee ID already exists';
       } else if (existingUser.email === email && email) {
         errorMessage = 'User with this email already exists';
@@ -39,15 +45,22 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if unregistered user exists
-    const unregisteredUser = await UnregisteredUser.findOne({ rfid });
+    const unregisteredUserQuery: any = [];
+    if (rfid) unregisteredUserQuery.push({ rfid });
+    if (fingerId) unregisteredUserQuery.push({ fingerId });
+    
+    const unregisteredUser = unregisteredUserQuery.length > 0 
+      ? await UnregisteredUser.findOne({ $or: unregisteredUserQuery })
+      : null;
 
     // Create new user
     const userData: any = {
-      rfid,
       name,
       attendance: 0,
     };
     
+    if (rfid) userData.rfid = rfid;
+    if (fingerId) userData.fingerId = fingerId;
     if (employeeId) userData.employeeId = employeeId;
     if (email) userData.email = email;
 
@@ -66,6 +79,7 @@ export async function POST(request: NextRequest) {
       user: {
         id: user._id,
         rfid: user.rfid,
+        fingerId: user.fingerId,
         name: user.name,
         employeeId: user.employeeId,
         email: user.email,

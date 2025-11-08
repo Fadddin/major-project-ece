@@ -3,11 +3,12 @@
 import type React from "react"
 
 import { useState } from "react"
-import { Search, Plus, Edit2, Trash2, Loader2 } from "lucide-react"
+import { Search, Plus, Edit2, Trash2, Loader2, Eye } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useUsers, registerUser, updateUser, deleteUser, type User } from "@/hooks/use-api"
+import { UserAttendanceModal } from "@/components/user-attendance-modal"
 
 export function UsersTable() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -17,7 +18,9 @@ export function UsersTable() {
   const [showModal, setShowModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
-  const [formData, setFormData] = useState({ name: "", rfid: "", employeeId: "", email: "" })
+  const [showAttendanceModal, setShowAttendanceModal] = useState(false)
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
+  const [formData, setFormData] = useState({ name: "", rfid: "", fingerId: "", employeeId: "", email: "" })
   const [editData, setEditData] = useState({ id: "", name: "", employeeId: "", email: "" })
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -28,23 +31,25 @@ export function UsersTable() {
   const filteredUsers = users.filter(
     (user) =>
       user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.rfid.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (user.rfid && user.rfid.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (user.fingerId && user.fingerId.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (user.employeeId && user.employeeId.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (user.email && user.email.toLowerCase().includes(searchTerm.toLowerCase())),
   )
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (formData.name && formData.rfid) {
+    if (formData.name && (formData.rfid || formData.fingerId)) {
       try {
         setIsSubmitting(true)
         await registerUser({
           name: formData.name,
-          rfid: formData.rfid,
+          rfid: formData.rfid || undefined,
+          fingerId: formData.fingerId || undefined,
           employeeId: formData.employeeId || undefined,
           email: formData.email || undefined,
         })
-        setFormData({ name: "", rfid: "", employeeId: "", email: "" })
+        setFormData({ name: "", rfid: "", fingerId: "", employeeId: "", email: "" })
         setShowModal(false)
         refetch() // Refresh the data
       } catch (error) {
@@ -111,6 +116,20 @@ export function UsersTable() {
     }
   }
 
+  const handleViewAttendance = (userId: string) => {
+    setSelectedUserId(userId)
+    setShowAttendanceModal(true)
+  }
+
+  const handleRowClick = (user: User, event: React.MouseEvent) => {
+    // Don't trigger row click if clicking on action buttons
+    const target = event.target as HTMLElement
+    if (target.closest('button')) {
+      return
+    }
+    handleViewAttendance(user._id)
+  }
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -157,7 +176,7 @@ export function UsersTable() {
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Search by name, RFID, employee ID, or email..."
+            placeholder="Search by name, RFID, Finger ID, employee ID, or email..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10 bg-input border-border/50 focus:border-primary"
@@ -180,6 +199,7 @@ export function UsersTable() {
               <tr className="border-b border-border/50 bg-secondary/30">
                 <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Name</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">RFID</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Finger ID</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Employee ID</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Email</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Attendance</th>
@@ -189,9 +209,14 @@ export function UsersTable() {
             </thead>
             <tbody>
               {filteredUsers.map((user) => (
-                <tr key={user._id} className="border-b border-border/50 hover:bg-secondary/20 transition-colors">
+                <tr 
+                  key={user._id} 
+                  className="border-b border-border/50 hover:bg-secondary/20 transition-colors cursor-pointer"
+                  onClick={(e) => handleRowClick(user, e)}
+                >
                   <td className="px-6 py-4 text-sm text-foreground font-medium">{user.name}</td>
-                  <td className="px-6 py-4 text-sm text-muted-foreground font-mono">{user.rfid}</td>
+                  <td className="px-6 py-4 text-sm text-muted-foreground font-mono">{user.rfid || '-'}</td>
+                  <td className="px-6 py-4 text-sm text-muted-foreground font-mono">{user.fingerId || '-'}</td>
                   <td className="px-6 py-4 text-sm text-foreground">{user.employeeId || '-'}</td>
                   <td className="px-6 py-4 text-sm text-foreground">{user.email || '-'}</td>
                   <td className="px-6 py-4 text-sm text-foreground font-medium">{user.attendance}</td>
@@ -202,8 +227,24 @@ export function UsersTable() {
                     <Button 
                       variant="ghost" 
                       size="sm" 
+                      className="text-blue-500 hover:bg-blue-500/10"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleViewAttendance(user._id)
+                      }}
+                      title="View Attendance"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
                       className="text-primary hover:bg-primary/10"
-                      onClick={() => handleEditUser(user)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleEditUser(user)
+                      }}
+                      title="Edit User"
                     >
                       <Edit2 className="w-4 h-4" />
                     </Button>
@@ -211,7 +252,11 @@ export function UsersTable() {
                       variant="ghost"
                       size="sm"
                       className="text-destructive hover:bg-destructive/10"
-                      onClick={() => handleDeleteUser(user._id)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDeleteUser(user._id)
+                      }}
+                      title="Delete User"
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
@@ -241,14 +286,25 @@ export function UsersTable() {
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-foreground mb-2 block">RFID *</label>
+                  <label className="text-sm font-medium text-foreground mb-2 block">RFID</label>
                   <Input
-                    placeholder="RF006"
+                    placeholder="RF006 (optional)"
                     value={formData.rfid}
                     onChange={(e) => setFormData({ ...formData, rfid: e.target.value })}
                     className="bg-input border-border/50"
-                    required
                   />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-foreground mb-2 block">Finger ID</label>
+                  <Input
+                    placeholder="12345 (optional)"
+                    value={formData.fingerId}
+                    onChange={(e) => setFormData({ ...formData, fingerId: e.target.value })}
+                    className="bg-input border-border/50"
+                  />
+                </div>
+                <div className="text-xs text-muted-foreground -mt-2">
+                  * At least one of RFID or Finger ID is required
                 </div>
                 <div>
                   <label className="text-sm font-medium text-foreground mb-2 block">Employee ID</label>
@@ -396,6 +452,16 @@ export function UsersTable() {
           </Card>
         </div>
       )}
+
+      {/* User Attendance Modal */}
+      <UserAttendanceModal
+        userId={selectedUserId}
+        isOpen={showAttendanceModal}
+        onClose={() => {
+          setShowAttendanceModal(false)
+          setSelectedUserId(null)
+        }}
+      />
     </div>
   )
 }

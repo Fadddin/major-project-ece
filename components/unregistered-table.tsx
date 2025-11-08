@@ -15,6 +15,7 @@ export function UnregisteredTable() {
   const { data, loading, error, refetch } = useUnregisteredUsers(page, limit)
   const [showModal, setShowModal] = useState(false)
   const [selectedRfid, setSelectedRfid] = useState<string | null>(null)
+  const [selectedFingerId, setSelectedFingerId] = useState<string | null>(null)
   const [formData, setFormData] = useState({ name: "", employeeId: "", email: "" })
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -22,11 +23,12 @@ export function UnregisteredTable() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (selectedRfid && formData.name) {
+    if ((selectedRfid || selectedFingerId) && formData.name) {
       try {
         setIsSubmitting(true)
         await registerUser({
-          rfid: selectedRfid,
+          rfid: selectedRfid || undefined,
+          fingerId: selectedFingerId || undefined,
           name: formData.name,
           employeeId: formData.employeeId || undefined,
           email: formData.email || undefined,
@@ -35,6 +37,7 @@ export function UnregisteredTable() {
         // Reset form
         setFormData({ name: "", employeeId: "", email: "" })
         setSelectedRfid(null)
+        setSelectedFingerId(null)
         setShowModal(false)
         refetch() // Refresh the data
       } catch (error) {
@@ -112,6 +115,7 @@ export function UnregisteredTable() {
               <thead>
                 <tr className="border-b border-border/50 bg-secondary/30">
                   <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">RFID Tag</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Finger ID</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Last Seen</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Scanned Count</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Actions</th>
@@ -120,7 +124,8 @@ export function UnregisteredTable() {
               <tbody>
                 {unregistered.map((record) => (
                   <tr key={record._id} className="border-b border-border/50 hover:bg-secondary/20 transition-colors">
-                    <td className="px-6 py-4 text-sm text-foreground font-mono font-medium">{record.rfid}</td>
+                    <td className="px-6 py-4 text-sm text-foreground font-mono font-medium">{record.rfid || '-'}</td>
+                    <td className="px-6 py-4 text-sm text-foreground font-mono font-medium">{record.fingerId || '-'}</td>
                     <td className="px-6 py-4 text-sm text-muted-foreground">
                       {new Date(record.lastSeen).toLocaleString()}
                     </td>
@@ -128,7 +133,8 @@ export function UnregisteredTable() {
                     <td className="px-6 py-4 text-sm flex gap-2">
                       <Button
                         onClick={() => {
-                          setSelectedRfid(record.rfid)
+                          setSelectedRfid(record.rfid || null)
+                          setSelectedFingerId(record.fingerId || null)
                           setShowModal(true)
                         }}
                         className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2 text-xs"
@@ -158,8 +164,13 @@ export function UnregisteredTable() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <Card className="w-full max-w-md border border-border/50">
             <div className="p-6">
-              <h2 className="text-xl font-bold text-foreground mb-4">Register RFID Tag</h2>
-              <p className="text-sm text-muted-foreground mb-4">RFID: {selectedRfid}</p>
+              <h2 className="text-xl font-bold text-foreground mb-4">Register User</h2>
+              {(selectedRfid || selectedFingerId) && (
+                <div className="text-sm text-muted-foreground mb-4 space-y-1">
+                  {selectedRfid && <p>RFID: {selectedRfid}</p>}
+                  {selectedFingerId && <p>Finger ID: {selectedFingerId}</p>}
+                </div>
+              )}
               <form onSubmit={handleRegister} className="space-y-4">
                 <div>
                   <label className="text-sm font-medium text-foreground mb-2 block">Employee Name *</label>

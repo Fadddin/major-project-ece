@@ -53,10 +53,11 @@ export function AttendanceTable() {
 
   const handleExport = () => {
     const csv = [
-      ["Name", "RFID", "Subject", "Course Code", "Instructor", "Date", "Time", "Type"], 
-      ...attendance.filter(r => r && r.rfid).map((r) => [
+      ["Name", "RFID", "Finger ID", "Subject", "Course Code", "Instructor", "Date", "Time", "Type"], 
+      ...attendance.filter(r => r && (r.rfid || r.fingerId)).map((r) => [
         getUserName(r),
-        r.rfid,
+        r.rfid || "",
+        r.fingerId || "",
         r.subjectName || "No subject",
         r.courseCode || "",
         r.instructor || "",
@@ -359,6 +360,7 @@ export function AttendanceTable() {
               <tr className="border-b border-border/50 bg-secondary/30">
                 <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Name</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">RFID</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Finger ID</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Subject</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Date</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-foreground">Time</th>
@@ -371,7 +373,8 @@ export function AttendanceTable() {
                   <td className="px-6 py-4 text-sm text-foreground font-medium">
                     {getUserName(record)}
                   </td>
-                  <td className="px-6 py-4 text-sm text-muted-foreground font-mono">{record.rfid}</td>
+                  <td className="px-6 py-4 text-sm text-muted-foreground font-mono">{record.rfid || '-'}</td>
+                  <td className="px-6 py-4 text-sm text-muted-foreground font-mono">{record.fingerId || '-'}</td>
                   <td className="px-6 py-4 text-sm text-foreground">
                     {record.subjectName ? (
                       <div>

@@ -3,6 +3,7 @@ import mongoose, { Schema, Document } from 'mongoose';
 export interface IUser extends Document {
   userId?: mongoose.Types.ObjectId;
   rfid: string;
+  fingerId?: string;
   name: string;
   employeeId?: string;
   email?: string;
@@ -20,6 +21,10 @@ const UserSchema = new Schema<IUser>({
     required: true,
     unique: true,
   },
+  fingerId: {
+    type: String,
+    required: false,
+  },
   name: {
     type: String,
     required: true,
@@ -27,7 +32,6 @@ const UserSchema = new Schema<IUser>({
   employeeId: {
     type: String,
     required: false,
-    unique: true,
     sparse: true, // Allows multiple null values
   },
   email: {

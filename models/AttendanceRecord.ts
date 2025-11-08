@@ -1,7 +1,8 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IAttendanceRecord extends Document {
-  rfid: string;
+  rfid?: string;
+  fingerId?: string;
   userId?: mongoose.Types.ObjectId;
   subjectId?: mongoose.Types.ObjectId;
   subjectName?: string;
@@ -14,7 +15,11 @@ export interface IAttendanceRecord extends Document {
 const AttendanceRecordSchema = new Schema<IAttendanceRecord>({
   rfid: {
     type: String,
-    required: true,
+    required: false,
+  },
+  fingerId: {
+    type: String,
+    required: false,
   },
   userId: {
     type: Schema.Types.ObjectId,
@@ -47,6 +52,15 @@ const AttendanceRecordSchema = new Schema<IAttendanceRecord>({
     enum: ['check-in', 'check-out'],
     required: true,
   },
+});
+
+// Validate that at least one identifier (rfid or fingerId) is present
+AttendanceRecordSchema.pre('validate', function(next) {
+  if (!this.rfid && !this.fingerId) {
+    next(new Error('Either rfid or fingerId must be provided'));
+  } else {
+    next();
+  }
 });
 
 // Force model refresh to ensure new fields are recognized

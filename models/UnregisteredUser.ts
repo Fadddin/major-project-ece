@@ -2,6 +2,7 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IUnregisteredUser extends Document {
   rfid: string;
+  fingerId?: string;
   lastSeen: Date;
   scannedCount: number;
 }
@@ -11,6 +12,10 @@ const UnregisteredUserSchema = new Schema<IUnregisteredUser>({
     type: String,
     required: true,
     unique: true,
+  },
+  fingerId: {
+    type: String,
+    required: false,
   },
   lastSeen: {
     type: Date,

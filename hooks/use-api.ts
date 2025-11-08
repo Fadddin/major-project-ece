@@ -3,7 +3,8 @@ import { useState, useEffect } from 'react';
 // Types
 export interface User {
   _id: string;
-  rfid: string;
+  rfid?: string;
+  fingerId?: string;
   name: string;
   employeeId?: string;
   email?: string;
@@ -13,14 +14,16 @@ export interface User {
 
 export interface UnregisteredUser {
   _id: string;
-  rfid: string;
+  rfid?: string;
+  fingerId?: string;
   lastSeen: string;
   scannedCount: number;
 }
 
 export interface AttendanceRecord {
   _id: string;
-  rfid: string;
+  rfid?: string;
+  fingerId?: string;
   userName?: string;
   userId?: string | {
     _id?: string;
@@ -65,6 +68,36 @@ export interface SelectedSubject {
   courseCode: string;
   instructor: string;
   selectedAt: string;
+}
+
+export interface UserAttendanceRecord {
+  _id: string;
+  timestamp: string;
+  type: 'check-in' | 'check-out';
+  rfid?: string;
+  fingerId?: string;
+}
+
+export interface UserAttendanceBySubject {
+  subjectId: string;
+  subjectName: string;
+  courseCode: string;
+  instructor: string;
+  records: UserAttendanceRecord[];
+  totalAttendance: number;
+}
+
+export interface UserAttendanceData {
+  user: {
+    _id: string;
+    name: string;
+    rfid?: string;
+    fingerId?: string;
+    employeeId?: string;
+    email?: string;
+  };
+  attendanceBySubject: UserAttendanceBySubject[];
+  totalRecords: number;
 }
 
 // Custom hooks for data fetching
@@ -404,8 +437,56 @@ export function useSelectedSubject() {
   return { data, loading, error, refetch };
 }
 
+export function useUserAttendance(userId: string | null) {
+  const [data, setData] = useState<UserAttendanceData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const fetchUserAttendance = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`/api/users/${userId}/attendance`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch user attendance');
+        }
+        const result = await response.json();
+        setData(result.data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An error occurred');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserAttendance();
+  }, [userId]);
+
+  const refetch = async () => {
+    if (!userId) return;
+    
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/users/${userId}/attendance`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch user attendance');
+      }
+      const result = await response.json();
+      setData(result.data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { data, loading, error, refetch };
+}
+
 // API functions
-export async function registerUser(userData: { rfid: string; name: string; employeeId?: string; email?: string }) {
+export async function registerUser(userData: { rfid?: string; fingerId?: string; name: string; employeeId?: string; email?: string }) {
   const response = await fetch('/api/users/register', {
     method: 'POST',
     headers: {
