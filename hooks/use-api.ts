@@ -503,13 +503,26 @@ export async function registerUser(userData: { rfid?: string; fingerId?: string;
   return response.json();
 }
 
-export async function recordAttendance(rfid: string) {
+export async function recordAttendance(rfid: string, time?: string | number | Date) {
+  // Use provided time or current client time (not server time)
+  // This ensures the attendance time reflects when attendance was actually taken
+  const timeToSend = time !== undefined 
+    ? (typeof time === 'string' || typeof time === 'number' 
+        ? time 
+        : time instanceof Date 
+          ? time.toISOString() 
+          : new Date().toISOString())
+    : new Date().toISOString();
+  
   const response = await fetch('/api/attendance', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ rfid }),
+    body: JSON.stringify({ 
+      rfid,
+      time: timeToSend 
+    }),
   });
 
   if (!response.ok) {

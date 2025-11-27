@@ -45,7 +45,7 @@ const AttendanceRecordSchema = new Schema<IAttendanceRecord>({
   },
   timestamp: {
     type: Date,
-    default: Date.now,
+    default: () => new Date(), // Use function to ensure it's called at document creation time
   },
   type: {
     type: String,

@@ -202,11 +202,25 @@ export async function POST(request: NextRequest) {
       }
 
       console.log('Final attendance record data:', attendanceRecordData);
+      console.log('Timestamp being set:', {
+        recordTimestamp,
+        isoString: recordTimestamp.toISOString(),
+        timestampValue: attendanceRecordData.timestamp
+      });
       const attendanceRecord = new AttendanceRecord(attendanceRecordData);
-      console.log('Created attendance record before save:', attendanceRecord);
-      console.log('Attendance record toObject():', attendanceRecord.toObject());
+      // Explicitly set timestamp to ensure it's not overridden by default
+      attendanceRecord.timestamp = recordTimestamp;
+      console.log('Created attendance record before save:', {
+        timestamp: attendanceRecord.timestamp,
+        timestampISO: attendanceRecord.timestamp.toISOString()
+      });
       await attendanceRecord.save();
-      console.log('Attendance record after save:', await AttendanceRecord.findById(attendanceRecord._id));
+      const savedRecord = await AttendanceRecord.findById(attendanceRecord._id);
+      console.log('Attendance record after save:', {
+        _id: savedRecord?._id,
+        timestamp: savedRecord?.timestamp,
+        timestampISO: savedRecord?.timestamp?.toISOString()
+      });
 
       return NextResponse.json({
         success: true,
@@ -268,9 +282,25 @@ export async function POST(request: NextRequest) {
       }
 
       console.log('Final unregistered user attendance record data:', attendanceRecordData);
+      console.log('Timestamp being set for unregistered user:', {
+        recordTimestamp,
+        isoString: recordTimestamp.toISOString(),
+        timestampValue: attendanceRecordData.timestamp
+      });
       const attendanceRecord = new AttendanceRecord(attendanceRecordData);
-      console.log('Created unregistered user attendance record:', attendanceRecord);
+      // Explicitly set timestamp to ensure it's not overridden by default
+      attendanceRecord.timestamp = recordTimestamp;
+      console.log('Created unregistered user attendance record:', {
+        timestamp: attendanceRecord.timestamp,
+        timestampISO: attendanceRecord.timestamp.toISOString()
+      });
       await attendanceRecord.save();
+      const savedRecord = await AttendanceRecord.findById(attendanceRecord._id);
+      console.log('Unregistered user attendance record after save:', {
+        _id: savedRecord?._id,
+        timestamp: savedRecord?.timestamp,
+        timestampISO: savedRecord?.timestamp?.toISOString()
+      });
 
       return NextResponse.json({
         success: true,
