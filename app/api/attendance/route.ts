@@ -14,6 +14,53 @@ const corsHeaders = {
   'Access-Control-Max-Age': '86400',
 };
 
+/**
+ * Validates and parses a time value into a valid Date object
+ * Supports:
+ * - ISO 8601 strings (e.g., "2024-01-15T10:30:00Z", "2024-01-15T10:30:00.000Z")
+ * - Unix timestamps (milliseconds or seconds)
+ * - Date strings parseable by Date constructor
+ * 
+ * @param time - Time value to parse (string, number, or Date)
+ * @returns Valid Date object or null if invalid
+ */
+function parseTime(time: any): Date | null {
+  if (!time) {
+    return null;
+  }
+
+  // If it's already a Date object, validate it
+  if (time instanceof Date) {
+    return isNaN(time.getTime()) ? null : time;
+  }
+
+  // If it's a number, treat as timestamp (milliseconds or seconds)
+  if (typeof time === 'number') {
+    // If timestamp is in seconds (less than year 2000 in milliseconds), convert to milliseconds
+    const timestamp = time < 946684800000 ? time * 1000 : time;
+    const date = new Date(timestamp);
+    return isNaN(date.getTime()) ? null : date;
+  }
+
+  // If it's a string, try to parse it
+  if (typeof time === 'string') {
+    // Try ISO 8601 format first (most common)
+    const isoDate = new Date(time);
+    if (!isNaN(isoDate.getTime())) {
+      return isoDate;
+    }
+
+    // Try parsing as timestamp string
+    const timestamp = Number(time);
+    if (!isNaN(timestamp)) {
+      const date = timestamp < 946684800000 ? new Date(timestamp * 1000) : new Date(timestamp);
+      return isNaN(date.getTime()) ? null : date;
+    }
+  }
+
+  return null;
+}
+
 // Handle preflight OPTIONS requests
 export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
@@ -27,7 +74,7 @@ export async function POST(request: NextRequest) {
     await connectDB();
 
     const { rfid, fingerId, time } = await request.json();
-    console.log("gotten rfid, fingerId, and time", rfid, fingerId, time);
+    console.log("Received rfid, fingerId, and time", { rfid, fingerId, time, timeType: typeof time });
 
     // Validate that at least one identifier is provided
     if (!rfid && !fingerId) {
@@ -37,8 +84,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Use provided time or current time for the record
-    const recordTimestamp = time ? new Date(time) : new Date();
+    // Parse and validate time format
+    let recordTimestamp: Date;
+    if (time) {
+      const parsedTime = parseTime(time);
+      if (!parsedTime) {
+        console.error('Invalid time format received:', time);
+        return NextResponse.json(
+          { 
+            error: 'Invalid time format. Please provide a valid ISO 8601 string (e.g., "2024-01-15T10:30:00Z") or Unix timestamp (milliseconds or seconds)',
+            receivedTime: time,
+            timeType: typeof time
+          },
+          { status: 400, headers: corsHeaders }
+        );
+      }
+      recordTimestamp = parsedTime;
+      console.log('Parsed time successfully:', {
+        original: time,
+        parsed: recordTimestamp.toISOString(),
+        local: recordTimestamp.toLocaleString()
+      });
+    } else {
+      recordTimestamp = new Date();
+      console.log('No time provided, using current time:', recordTimestamp.toISOString());
+    }
 
     // Get selected subject if any
     const selectedSubject = await SelectedSubject.findOne();

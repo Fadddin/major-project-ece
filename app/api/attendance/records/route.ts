@@ -25,14 +25,18 @@ export async function GET(request: NextRequest) {
       const users = await User.find({
         $or: [
           { name: { $regex: search, $options: 'i' } },
-          { rfid: { $regex: search, $options: 'i' } }
+          { rfid: { $regex: search, $options: 'i' } },
+          { fingerId: { $regex: search, $options: 'i' } }
         ]
       });
-      const userIds = users.map(user => user.rfid);
+      const rfids = users.map(user => user.rfid).filter(Boolean);
+      const fingerIds = users.map(user => user.fingerId).filter(Boolean);
       
       filter.$or = [
-        { rfid: { $in: userIds } },
-        { rfid: { $regex: search, $options: 'i' } }
+        { rfid: { $in: rfids } },
+        { fingerId: { $in: fingerIds } },
+        { rfid: { $regex: search, $options: 'i' } },
+        { fingerId: { $regex: search, $options: 'i' } }
       ];
     }
 
@@ -57,11 +61,17 @@ export async function GET(request: NextRequest) {
       .skip(skip)
       .limit(limit);
 
-    // Get all users to create a lookup map
+    // Get all users to create a lookup map (by both rfid and fingerId)
     const users = await User.find({});
-    const userMap = new Map();
+    const userMapByRfid = new Map();
+    const userMapByFingerId = new Map();
     users.forEach(user => {
-      userMap.set(user.rfid, user.name);
+      if (user.rfid) {
+        userMapByRfid.set(user.rfid, user.name);
+      }
+      if (user.fingerId) {
+        userMapByFingerId.set(user.fingerId, user.name);
+      }
     });
 
     // Map attendance records with user names and subject data
@@ -69,6 +79,7 @@ export async function GET(request: NextRequest) {
       console.log('Processing attendance record:', {
         _id: record._id,
         rfid: record.rfid,
+        fingerId: record.fingerId,
         subjectId: record.subjectId,
         subjectName: record.subjectName,
         courseCode: record.courseCode,
@@ -76,10 +87,18 @@ export async function GET(request: NextRequest) {
         timestamp: record.timestamp
       });
       
+      // Look up user name by rfid or fingerId
+      const userName = record.rfid 
+        ? userMapByRfid.get(record.rfid)
+        : record.fingerId 
+          ? userMapByFingerId.get(record.fingerId)
+          : null;
+      
       return {
         _id: record._id,
         rfid: record.rfid,
-        userName: userMap.get(record.rfid) || 'Unknown User',
+        fingerId: record.fingerId,
+        userName: userName || 'Unknown User',
         timestamp: record.timestamp,
         type: record.type,
         subjectId: record.subjectId,
