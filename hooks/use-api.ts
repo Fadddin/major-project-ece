@@ -203,6 +203,7 @@ export function useUnregisteredUsers(page = 1, limit = 10) {
           throw new Error('Failed to fetch unregistered users');
         }
         const result = await response.json();
+        console.log(result.data);
         setData(result.data);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');

@@ -17,6 +17,25 @@ import {
 } from "@/components/ui/pagination"
 import { useAttendanceRecordsPaginated, useSubjects, useSelectedSubject, selectSubject, clearSelectedSubject, getUserName } from "@/hooks/use-api"
 
+// Helper functions to format date and time using UTC to preserve the original time sent
+const formatAttendanceDate = (timestamp: string) => {
+  const date = new Date(timestamp);
+  // Use UTC methods to avoid timezone conversion
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const formatAttendanceTime = (timestamp: string) => {
+  const date = new Date(timestamp);
+  // Use UTC methods to preserve the original time that was sent
+  const hours = String(date.getUTCHours()).padStart(2, '0');
+  const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+  const seconds = String(date.getUTCSeconds()).padStart(2, '0');
+  return `${hours}:${minutes}:${seconds}`;
+};
+
 export function AttendanceTable() {
   const [searchTerm, setSearchTerm] = useState("")
   const [dateFilter, setDateFilter] = useState("")
@@ -61,8 +80,8 @@ export function AttendanceTable() {
         r.subjectName || "No subject",
         r.courseCode || "",
         r.instructor || "",
-        new Date(r.timestamp).toLocaleDateString(),
-        new Date(r.timestamp).toLocaleTimeString(),
+        formatAttendanceDate(r.timestamp),
+        formatAttendanceTime(r.timestamp),
         r.type
       ])
     ]
@@ -388,10 +407,10 @@ export function AttendanceTable() {
                     )}
                   </td>
                   <td className="px-6 py-4 text-sm text-foreground">
-                    {new Date(record.timestamp).toLocaleDateString()}
+                    {formatAttendanceDate(record.timestamp)}
                   </td>
                   <td className="px-6 py-4 text-sm text-foreground font-medium">
-                    {new Date(record.timestamp).toLocaleTimeString()}
+                    {formatAttendanceTime(record.timestamp)}
                   </td>
                   <td className="px-6 py-4 text-sm">
                     <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
