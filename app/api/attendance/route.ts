@@ -26,8 +26,8 @@ export async function POST(request: NextRequest) {
   try {
     await connectDB();
 
-    const { rfid, fingerId } = await request.json();
-    console.log("gotten rfid and fingerId", rfid, fingerId);
+    const { rfid, fingerId, time } = await request.json();
+    console.log("gotten rfid, fingerId, and time", rfid, fingerId, time);
 
     // Validate that at least one identifier is provided
     if (!rfid && !fingerId) {
@@ -37,8 +37,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Use current time for the record
-    const recordTimestamp = new Date();
+    // Use provided time or current time for the record
+    const recordTimestamp = time ? new Date(time) : new Date();
 
     // Get selected subject if any
     const selectedSubject = await SelectedSubject.findOne();
